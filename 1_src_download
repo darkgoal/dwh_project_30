@@ -1,51 +1,52 @@
 -- 1 шаг - загрузка данных в src
-drop table src_flights;
+drop table src.flights;
 
-create table src_flights(
-fl_year varchar(5) not NULL, 
-fl_quarter varchar(5) not NULL, 
-fl_month varchar(5) not NULL, 
-fl_date date not NULL, 
+create table src.flights(
+flight_year varchar(5) not NULL, 
+flight_quarter varchar(5) not NULL, 
+flight_month varchar(5) not NULL, 
+flight_date varchar(30) not NULL, 
 reporting_airline varchar(5) not null,
-tail_num varchar(10),
-flight_num varchar(10) not null,
+tail_number varchar(10),
+flight_number varchar(10) not null,
 origin varchar(5) not null,
 destination varchar(5) not null,
-crs_dep_time time not null,
-dep_time time,
-dep_delay_min NUMERIC(6,2),
-cancelled NUMERIC(2,1) not null,
-cancellation_code varchar(5),
-air_time NUMERIC(6,2),
-distance NUMERIC(6,2) not null,
-weather_delay NUMERIC(6,2),
+crs_dep_time varchar(15) not null,
+dep_time varchar(15),
+dep_delay_min varchar(10),
+cancelled float not null,
+cancellation_code char(1),
+air_time varchar(10),
+distance varchar(10) not null,
+weather_delay varchar(10),
 loaded_ts timestamp NOT NULL DEFAULT now()
 ); -- works
 
---\copy src_flights(fl_year, fl_quarter, fl_month, fl_date, reporting_airline, tail_num, flight_num, origin, destination, crs_dep_time, dep_time, dep_delay_min, cancelled, cancellation_code, air_time,distance, weather_delay) from '/Users/viktorz3/Desktop/dwh/!project/src data/T_ONTIME_REPORTING_05.csv' with delimiter ',' CSV HEADER;
+\copy src.flights(flight_year, flight_quarter, flight_month, flight_date, reporting_airline, tail_number, flight_number, origin, destination, crs_dep_time, dep_time, dep_delay_min, cancelled, cancellation_code, air_time,distance, weather_delay) from '/Users/viktorz3/Desktop/dwh/!project/src data/T_ONTIME_REPORTING_05.csv' with delimiter ',' CSV HEADER;
 
 
 
-drop table src_weather;
+drop table src.weather;
 
-create table src_weather(
-local_time varchar(50) not null,
-temperature NUMERIC(4,1) not null,
-pres_station_lvl NUMERIC(4,1) NOT null,
-pres_sea_lvl NUMERIC(4,1) NOT null,
-humidity int not null,
+create table src.weather(
+icao_code varchar(10) default 'KJFK',
+local_datetime varchar(25) not null,
+air_temp varchar(10) not null,
+p0_station_lvl varchar(10) NOT null,
+p_sea_lvl varchar(10) NOT null,
+humidity varchar(5) not null,
 wind_direction varchar(100),
-mean_wind_speed int,
+wind_speed varchar(5),
 max_gust_speed varchar(10),
 phenomena_observed varchar(50),
 phenomena_significant varchar(50),
 total_cloud_cover varchar(1000) not null,
-visibility NUMERIC(4,1) not null,
-dew_point_temp NUMERIC(4,1),
+visibility varchar(10) not null,
+dewpoint_temp varchar(10),
 loaded_ts timestamp NOT NULL DEFAULT now()
 ); --works
 
-\copy src_weather(local_time, temperature, pres_station_lvl, pres_sea_lvl, humidity, wind_direction, mean_wind_speed, max_gust_speed, phenomena_observed, phenomena_significant, total_cloud_cover, visibility, dew_point_temp) from '/Users/viktorz3/Desktop/dwh/!project/src data/KJFK_weather_05_08.csv' with delimiter ';' CSV HEADER;
+\copy src.weather(local_datetime, air_temp, p0_station_lvl, p_sea_lvl, humidity, wind_direction, wind_speed, max_gust_speed, phenomena_observed, phenomena_significant, total_cloud_cover, visibility, dewpoint_temp) from '/Users/viktorz3/Desktop/dwh/!project/src data/KJFK_weather_05_08.csv' with delimiter ';' CSV HEADER;
 
 
 

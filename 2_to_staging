@@ -7,9 +7,9 @@
 
 -- 2.0 - создание таблицы staging_flights
 
-drop table staging_flights;
 
-CREATE TABLE staging_flights (
+
+CREATE TABLE staging.flights (
 	flight_year int not NULL, 
 	flight_quarter int not NULL, 
 	flight_month int not NULL, 
@@ -35,7 +35,9 @@ CREATE TABLE staging_flights (
 
 
 -- 2.1 -- создаем таблицу с маркером последнего обработанного значения
-create table if not exists etl_load_flights_i_03(
+--drop table etl.load_flights_i_03;
+
+create table if not exists etl.load_flights_i_03(
 loaded_ts timestamp not null primary key
 -- маркер последнего обработанного значения
 ); -- сюда подставим эту дату после загрузки
@@ -44,31 +46,28 @@ loaded_ts timestamp not null primary key
 
 
 -- 2.2 -- определение границ самых свежих данных в src
-drop table if exists etl_load_flights_i_00;
+drop table if exists etl.load_flights_i_01;
 
-create table if not exists etl_load_flights_i_00 as
+create table if not exists etl.load_flights_i_01 as
 select
-	coalesce(min(loaded_ts), '1970-01-01') as ts1,
-	coalesce(max(loaded_ts), '3000-01-01') as ts2
-from src_flights
-where loaded_ts >= coalesce((select max(loaded_ts) 
-from etl_load_flights_i_03), '1970-01-01');
-
-select  * from etl_load_flights_i_00;
+	min(loaded_ts) as ts1,
+	max(loaded_ts) as ts2
+from src.flights
+where loaded_ts >= coalesce(
+	(select max(loaded_ts) from etl.load_flights_i_03), 
+'1970-01-01');
 
 
 
 -- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 
-update src_flights * 
-set dep_time = '2359'
-where dep_time = '2400';
 
---SELECT * FROM src_flights WHERE dep_time = '2400';
+-- !!!!!!!!! при первой загрузке данных в хранилище (когда оно еще пустое), 
+-- запустим создание снимка src БЕЗ ОГРАНИЧЕНИЙ !!!!!!!!!!
 
-drop table if exists etl_load_flights_i_01;
+drop table if exists etl.load_flights_i_02;
 
-create table if not exists etl_load_flights_i_01 as
+create table if not exists etl.load_flights_i_02 as
 select distinct
 	cast(flight_year as int) as flight_year, 
 	cast(flight_quarter as int) as flight_quarter, 
@@ -79,22 +78,45 @@ select distinct
 	flight_number,
 	origin,
 	destination,
-	to_timestamp(crs_dep_time, 'HH24MI')::TIME as crs_dep_time,
-	to_timestamp(dep_time, 'HH24MI')::TIME as dep_time,
-	dep_delay_min,
-	cancelled,
+	(select case when crs_dep_time = '2400' then '2359' else crs_dep_time end)::TIME as crs_dep_time,
+	(select case when dep_time = '2400' then '2359' else dep_time end)::TIME as dep_time,
+	cast(dep_delay_min as float) as dep_delay_min,
+	cast(cancelled as int) as cancelled,
 	cancellation_code,
-	air_time,
-	distance,
-	weather_delay
-from src_flights, etl_load_flights_i_00
+	air_time::float as air_time,
+	distance::float as distance,
+	weather_delay::float as weather_delay
+from src.flights , etl.load_flights_i_01;
+
+
+
+-- при последующих запусках, ограничение необходимо для уменьшения времени и ресурсов
+
+create table if not exists etl.load_flights_i_02 as
+select distinct
+	cast(flight_year as int) as flight_year, 
+	cast(flight_quarter as int) as flight_quarter, 
+	cast(flight_month as int) as flight_month , 
+	to_date(flight_date, 'MM/DD/YYYY') as flight_date, 
+	reporting_airline,
+	tail_number,
+	flight_number,
+	origin,
+	destination,
+	(select case when crs_dep_time = '2400' then '2359' else crs_dep_time end)::TIME as crs_dep_time,
+	(select case when dep_time = '2400' then '2359' else dep_time end)::TIME as dep_time,
+	cast(dep_delay_min as float) as dep_delay_min,
+	cast(cancelled as int) as cancelled,
+	cancellation_code,
+	air_time::float as air_time,
+	distance::float as distance,
+	weather_delay::float as weather_delay
+from src.flights , etl.load_flights_i_01
 where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
 
 
-
-
 -- 2.4 запись в целевую таблицу в режиме upsert
-insert into staging_flights(
+insert into staging.flights(
 	flight_year, 
 	flight_quarter, 
 	flight_month , 
@@ -131,25 +153,186 @@ select
 	air_time,
 	distance,
 	weather_delay
-from etl_load_flights_i_01 
-on conflict(flight_date, flight_number, origin, destination, crs_dep_time) do nothing;
+from etl.load_flights_i_02;
+--on conflict(flight_date, flight_number, origin, destination, crs_dep_time) do nothing;
 --raise exception 'Trying to update a previous line with --> %', (select * from excluded);
 
 
 
 -- 2.5 обновление последней известной метки loaded_ts
-delete from etl_load_flights_i_03 
-where exists (select 1 from etl_load_flights_i_00);
+delete from etl.load_flights_i_03 
+where exists (select 1 from etl.load_flights_i_01);
 
-insert into etl_load_flights_i_03 (loaded_ts)
+insert into etl.load_flights_i_03 (loaded_ts)
 select ts2
-from etl_load_flights_i_00 
-where exists (select 1 from etl_load_flights_i_00);
+from etl.load_flights_i_01
+where exists (select 1 from etl.load_flights_i_01);
 
 
 -- конец загрузки flights
+
+select * from staging.flights;
+
+
+
+
+
+
+
+
 
 
 -- шаг 2 для weather
 
 
+
+-- 2.0 - создание таблицы staging_weather
+
+drop table staging.weather;
+
+CREATE TABLE staging.weather (
+	icao_code varchar(10) NOT NULL,
+	local_datetime timestamp NOT NULL,
+	air_temp numeric(3, 1) NOT NULL,
+	p0_station_lvl numeric(4, 1) NOT NULL,
+	p_sea_lvl numeric(4, 1) NOT NULL,
+	humidity int4 NOT NULL,
+	wind_direction varchar(100) NULL,
+	wind_speed int4 NULL,
+	max_gust_speed int4 NULL,
+	phenomena_observed varchar(100) NULL,
+	phenomena_significant varchar(50) NULL,
+	total_cloud_cover varchar(200) NOT NULL,
+	visibility numeric(3, 1) NOT NULL,
+	dewpoint_temp numeric(3, 1),
+	loaded_ts timestamp NOT NULL DEFAULT now(),
+	PRIMARY KEY (icao_code, local_datetime)
+); 
+
+
+
+
+
+
+-- 2.1 -- создаем таблицу с маркером последнего обработанного значения
+create table if not exists etl.load_weather_i_03(
+loaded_ts timestamp not null primary key
+-- маркер последнего обработанного значения
+); -- сюда подставим эту дату после загрузки
+
+
+
+
+-- 2.2 -- определение границ самых свежих данных в src
+drop table if exists etl.load_weather_i_01;
+
+create table if not exists etl.load_weather_i_01 as
+select
+	min(loaded_ts) as ts1,
+	max(loaded_ts) as ts2
+from src.flights
+where loaded_ts >= coalesce((select max(loaded_ts) 
+from etl.load_weather_i_03), '1970-01-01');
+
+select  * from etl.load_weather_i_01;
+
+
+
+-- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
+
+-- первый запуск
+drop table if exists etl.load_weather_i_02;
+
+create table if not exists etl.load_weather_i_02 as
+select distinct
+	icao_code,
+	to_timestamp(local_datetime, 'DD:MM:YYYY HH24:MI') as local_datetime,
+	air_temp::numeric(3, 1) as air_temp,
+	p0_station_lvl::numeric(4, 1) as p0_station_lvl,
+	p_sea_lvl::numeric(4, 1) as p_sea_lvl,
+	humidity::int4 as humidity,
+	wind_direction,
+	wind_speed::int4 as wind_speed,
+	max_gust_speed::int4 as max_gust_speed,
+	phenomena_observed,
+	phenomena_significant,
+	total_cloud_cover,
+	visibility::numeric(3, 1) as visibility,
+	dewpoint_temp::numeric(3, 1) as dewpoint_temp
+from src.weather;
+
+select * from etl.load_weather_i_02;
+
+
+-- последующие запуски процедуры
+
+drop table if exists etl.load_weather_i_02;
+
+create table if not exists etl.load_weather_i_02 as
+select distinct
+	icao_code,
+	to_timestamp(local_datetime, 'DD:MM:YYYY HH24:MI') as local_datetime,
+	air_temp::numeric(3, 1) as air_temp,
+	p0_station_lvl::numeric(4, 1) as p0_station_lvl,
+	p_sea_lvl::numeric(4, 1) as p_sea_lvl,
+	humidity::int4 as humidity,
+	wind_direction,
+	wind_speed::int4 as wind_speed,
+	max_gust_speed::int4 as max_gust_speed,
+	phenomena_observed,
+	phenomena_significant,
+	total_cloud_cover,
+	visibility::numeric(3, 1) as visibility,
+	dewpoint_temp::numeric(3, 1) as dewpoint_temp
+from src.weather, etl.load_weather_i_01
+where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
+
+
+select * from etl.load_weather_i_02;
+
+-- 2.4 запись в целевую таблицу в режиме upsert
+insert into staging.weather(
+	icao_code,
+	local_datetime,
+	air_temp,
+	p0_station_lvl,
+	p_sea_lvl,
+	humidity,
+	wind_direction,
+	wind_speed,
+	max_gust_speed,
+	phenomena_observed,
+	phenomena_significant,
+	total_cloud_cover,
+	visibility,
+	dewpoint_temp
+) select
+	icao_code,
+	local_datetime,
+	air_temp,
+	p0_station_lvl,
+	p_sea_lvl,
+	humidity,
+	wind_direction,
+	wind_speed,
+	max_gust_speed,
+	phenomena_observed,
+	phenomena_significant,
+	total_cloud_cover,
+	visibility,
+	dewpoint_temp
+from etl.load_weather_i_02;
+
+--raise exception 'Trying to update a previous line with --> %', (select * from excluded);
+
+select * from staging.weather;
+
+
+-- 2.5 обновление последней известной метки loaded_ts
+delete from etl.load_weather_i_03 
+where exists (select 1 from etl.load_weather_i_01);
+
+insert into etl.load_weather_i_03 (loaded_ts)
+select ts2
+from etl.load_weather_i_01 
+where exists (select 1 from etl.load_weather_i_01);
