@@ -1,0 +1,155 @@
+
+-- 2 шаг - перенос данных src -> staging
+-- процедура загрузки данных в staging будет инкрементной, тк уже записанные данные о рейсах 
+-- могут меняться (мы так решили и точка)
+-- более того, такая процедура будет более быстрой и менее ресурсоемкой
+
+
+-- 2.0 - создание таблицы staging_flights
+
+drop table staging_flights;
+
+CREATE TABLE staging_flights (
+	flight_year int not NULL, 
+	flight_quarter int not NULL, 
+	flight_month int not NULL, 
+	flight_date date not NULL, 
+	reporting_airline varchar(5) not null,
+	tail_number varchar(10),
+	flight_number varchar(10) not null,
+	origin varchar(5) not null,
+	destination varchar(5) not null,
+	crs_dep_time time not null,
+	dep_time time,
+	dep_delay_min float,
+	cancelled int not null,
+	cancellation_code char(1),
+	air_time float,
+	distance float not null,
+	weather_delay float,
+	loaded_ts timestamp default(now()),
+	CONSTRAINT flights_pkey PRIMARY KEY (flight_date, flight_number, origin, destination, crs_dep_time)
+);
+
+
+
+
+-- 2.1 -- создаем таблицу с маркером последнего обработанного значения
+create table if not exists etl_load_flights_i_03(
+loaded_ts timestamp not null primary key
+-- маркер последнего обработанного значения
+); -- сюда подставим эту дату после загрузки
+
+
+
+
+-- 2.2 -- определение границ самых свежих данных в src
+drop table if exists etl_load_flights_i_00;
+
+create table if not exists etl_load_flights_i_00 as
+select
+	coalesce(min(loaded_ts), '1970-01-01') as ts1,
+	coalesce(max(loaded_ts), '3000-01-01') as ts2
+from src_flights
+where loaded_ts >= coalesce((select max(loaded_ts) 
+from etl_load_flights_i_03), '1970-01-01');
+
+select  * from etl_load_flights_i_00;
+
+
+
+-- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
+
+update src_flights * 
+set dep_time = '2359'
+where dep_time = '2400';
+
+--SELECT * FROM src_flights WHERE dep_time = '2400';
+
+drop table if exists etl_load_flights_i_01;
+
+create table if not exists etl_load_flights_i_01 as
+select distinct
+	cast(flight_year as int) as flight_year, 
+	cast(flight_quarter as int) as flight_quarter, 
+	cast(flight_month as int) as flight_month , 
+	to_date(flight_date, 'MM/DD/YYYY') as flight_date, 
+	reporting_airline,
+	tail_number,
+	flight_number,
+	origin,
+	destination,
+	to_timestamp(crs_dep_time, 'HH24MI')::TIME as crs_dep_time,
+	to_timestamp(dep_time, 'HH24MI')::TIME as dep_time,
+	dep_delay_min,
+	cancelled,
+	cancellation_code,
+	air_time,
+	distance,
+	weather_delay
+from src_flights, etl_load_flights_i_00
+where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
+
+
+
+
+-- 2.4 запись в целевую таблицу в режиме upsert
+insert into staging_flights(
+	flight_year, 
+	flight_quarter, 
+	flight_month , 
+	flight_date, 
+	reporting_airline,
+	tail_number,
+	flight_number,
+	origin,
+	destination,
+	crs_dep_time,
+	dep_time,
+	dep_delay_min,
+	cancelled,
+	cancellation_code,
+	air_time,
+	distance,
+	weather_delay
+	)
+select 
+	flight_year, 
+	flight_quarter, 
+	flight_month , 
+	flight_date, 
+	reporting_airline,
+	tail_number,
+	flight_number,
+	origin,
+	destination,
+	crs_dep_time,
+	dep_time,
+	dep_delay_min,
+	cancelled,
+	cancellation_code,
+	air_time,
+	distance,
+	weather_delay
+from etl_load_flights_i_01 
+on conflict(flight_date, flight_number, origin, destination, crs_dep_time) do nothing;
+--raise exception 'Trying to update a previous line with --> %', (select * from excluded);
+
+
+
+-- 2.5 обновление последней известной метки loaded_ts
+delete from etl_load_flights_i_03 
+where exists (select 1 from etl_load_flights_i_00);
+
+insert into etl_load_flights_i_03 (loaded_ts)
+select ts2
+from etl_load_flights_i_00 
+where exists (select 1 from etl_load_flights_i_00);
+
+
+-- конец загрузки flights
+
+
+-- шаг 2 для weather
+
+
