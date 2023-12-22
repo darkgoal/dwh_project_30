@@ -23,7 +23,7 @@ CREATE TABLE staging.flights (
 );
 
 
--- first insert
+-- initiation download - flights
 
 create table if not exists etl.load_flights_i_02 as
 select distinct
@@ -74,7 +74,7 @@ CREATE TABLE staging.weather (
 
 
 
--- for first insert
+-- initiation download - weather
 
 create table if not exists etl.load_weather_i_02 as
 select distinct
