@@ -29,9 +29,9 @@ select
  flight_quarter as quarter, 
  flight_month as month, 
  flight_date as flight_scheduled_date,
- (CASE WHEN (cancelled = 0) THEN DATE(date_add(flight_date, ((dep_delay_min::varchar(10)  ' '  ' min')::interval))::varchar(30)) ELSE NULL END)  as flight_actual_date,
- (flight_date::varchar(25)  ' '  crs_dep_time::varchar(25))::timestamp as flight_dep_scheduled_ts,
- (CASE WHEN (cancelled = 0) THEN (date_add((flight_date::varchar(25)  ' '  crs_dep_time::varchar(25))::timestamp, (dep_delay_min::varchar(10)  ' '  'min')::interval)) ELSE NULL END) as flight_dep_actual_ts,
+ (CASE WHEN (cancelled = 0) THEN DATE(flight_date::timestamp + ('' || dep_delay_min || ' minutes')::interval) ELSE NULL END)  as flight_actual_date,	
+ (flight_date::varchar(25) ||  ' ' ||  crs_dep_time::varchar(25))::timestamp as flight_dep_scheduled_ts,
+ (CASE WHEN (cancelled = 0) THEN (flight_date::varchar(30) || ' ' || crs_dep_time::varchar(25))::timestamp + ('' || dep_delay_min || ' minutes')::interval ELSE NULL END) as flight_dep_actual_ts,
  reporting_airline as report_airline,
  tail_number,
  flight_number as flight_number_reporting_airline,
@@ -45,11 +45,10 @@ select
  weather_delay,
  air_time,
  distance
-from kdz_30_staging.flights , kdz_30_etl.dds_load_flights_01
+from kdz_30_staging.flights, kdz_30_etl.dds_load_flights_01
 where loaded_ts > ts1 and loaded_ts <= ts2;
 
 -- 3.4 -- загрузка в dds
-
 insert into kdz_30_dds.flights(
  year, 
  quarter, 
@@ -92,7 +91,11 @@ insert into kdz_30_dds.flights(
  weather_delay,
  air_time,
  distance
-from kdz_30_etl.dds_load_flights_02;
+from kdz_30_etl.dds_load_flights_02
+on conflict on constraint flights_pkey do update
+set (tail_number, destination, dep_time, dep_delay_min, cancelled, cancellation_code, air_time, distance, weather_delay, loaded_ts) = 
+	(EXCLUDED.tail_number, EXCLUDED.destination, EXCLUDED.dep_time, EXCLUDED.dep_delay_min, 
+	EXCLUDED.cancelled, EXCLUDED.cancellation_code, EXCLUDED.air_time, EXCLUDED.distance, EXCLUDED.weather_delay, now());;
 
 -- 3.5 обновление последней известной метки loaded_ts
 
