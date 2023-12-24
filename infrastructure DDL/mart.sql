@@ -1,6 +1,6 @@
 -- создание таблицы фактов для основной витрины данных
 
-CREATE TABLE mart.fact_departure (
+CREATE TABLE kdz_30_mart.fact_departure (
 	airport_origin_dk int4 NOT NULL,
 	airport_destination_dk int4 NOT NULL,
 	weather_type_dk bpchar(6) NULL,
@@ -27,7 +27,7 @@ CREATE TABLE mart.fact_departure (
 
 -- инициализирующая загрузка
 
-create table if not exists etl.fact_download_02
+create table if not exists kdz_30_etl.fact_download_02
 as select 
 	f.airport_origin_dk,
 	f.airport_dest_dk as airport_destination_dk,
@@ -46,7 +46,7 @@ as select
 	w.w_speed,
 	f.air_time,
 	'30' as author 
-from dds.flights as f
-inner join dds.weather as w
+from kdz_30_dds.flights as f
+inner join kdz_30_dds.weather as w
 	on f.flight_dep_scheduled_ts >= w.date_start and f.flight_dep_scheduled_ts < w.date_end
 	and (f.airport_origin_dk = w.airport_dk or f.airport_dest_dk = w.airport_dk);
