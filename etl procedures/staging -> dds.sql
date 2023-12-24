@@ -16,7 +16,7 @@ select
  max(loaded_ts) as ts2
 from kdz_30_staging.flights
 where loaded_ts >= coalesce((select max(loaded_ts) 
-from etl.dds_load_flights_03), '1970-01-01');
+from kdz_30_etl.dds_load_flights_03), '1970-01-01');
 
 -- 3.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 -- P.S. работает только после инициализирующей загрузки
