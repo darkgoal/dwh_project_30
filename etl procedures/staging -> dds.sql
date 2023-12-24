@@ -1,12 +1,13 @@
 -- ETL 2 - flights
 -- эта процедура будет инкрементной
 
--- 3.1 маркер последней загрузки, границы самых свежих данных
-
+-- 3.1 маркер последней загрузки
 create table if not exists kdz_30_etl.dds_load_flights_03(
 loaded_ts timestamp not null primary key
 );
 
+
+-- 3.2 границы самых свежих данных в staging
 drop table if exists kdz_30_etl.dds_load_flights_01;
 
 create table if not exists kdz_30_etl.dds_load_flights_01 as
@@ -17,7 +18,7 @@ from kdz_30_staging.flights
 where loaded_ts >= coalesce((select max(loaded_ts) 
 from etl.dds_load_flights_03), '1970-01-01');
 
--- 3.2 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
+-- 3.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 -- P.S. работает только после инициализирующей загрузки
 
 drop table if exists kdz_30_etl.dds_load_flights_02;
@@ -47,7 +48,7 @@ select
 from kdz_30_staging.flights , kdz_30_etl.dds_load_flights_01
 where loaded_ts > ts1 and loaded_ts <= ts2;
 
--- 3.3 -- загрузка в dds
+-- 3.4 -- загрузка в dds
 
 insert into kdz_30_dds.flights(
  year, 
@@ -93,7 +94,7 @@ insert into kdz_30_dds.flights(
  distance
 from kdz_30_etl.dds_load_flights_02;
 
--- 3.4 обновление последней известной метки loaded_ts
+-- 3.5 обновление последней известной метки loaded_ts
 
 delete from kdz_30_etl.dds_load_flights_03 
 where exists (select 1 from kdz_30_etl.dds_load_flights_01);
@@ -103,6 +104,7 @@ select ts2
 from kdz_30_etl.dds_load_flights_01
 where exists (select 1 from kdz_30_etl.dds_load_flights_01);
 
+-- конец etl 2 для данных о полетах
 
 
 
@@ -110,12 +112,13 @@ where exists (select 1 from kdz_30_etl.dds_load_flights_01);
 -- ETL 2 - weather
 -- эта процедура тоже инкрементная + SCD 2
 
--- 3.1 маркер последней загрузки, границы самых свежих данных
+-- 3.1 маркер последней загрузки
 
 create table if not exists kdz_30_etl.dds_load_weather_03(
 loaded_ts timestamp not null primary key
 );
 
+-- 3.2 границы самых свежих данных в staging
 drop table if exists kdz_30_etl.dds_load_weather_01;
 
 create table if not exists kdz_30_etl.dds_load_weather_01 as
@@ -126,7 +129,7 @@ from staging.weather
 where loaded_ts >= coalesce((select max(loaded_ts) 
 from kdz_30_etl.dds_load_weather_i_03), '1970-01-01');
 
--- 3.2 - снимок новых данных (с доп. обработкой)
+-- 3.3 - снимок новых данных (с доп. обработкой)
 
 drop table if exists kdz_30_etl.dds_load_weather_02;
 
@@ -156,7 +159,7 @@ select
 from kdz_30_staging.weather , kdz_30_etl.dds_load_weather_01
 where loaded_ts > ts1 and loaded_ts <= ts2;
 
--- 3.3 обновление последнего date_end в старых данных на первый date_start из новых данных
+-- 3.4 обновление последнего date_end в старых данных на первый date_start из новых данных
 
 update kdz_30_dds.weather 
 set date_end = (select date_start 
@@ -165,7 +168,7 @@ set date_end = (select date_start
  LIMIT 1)
 where date_end=('3000-01-01'::timestamp);
 
--- 3.4 загрузка в dds
+-- 3.5 загрузка в dds
 
 insert into kdz_30_dds.weather(
  airport_dk, 
@@ -197,7 +200,7 @@ insert into kdz_30_dds.weather(
  date_end
 from kdz_30_etl.dds_load_weather_02;
 
--- 3.5 обновление последней известной метки loaded_ts
+-- 3.6 обновление последней известной метки loaded_ts
 
 delete from kdz_30_etl.dds_load_flights_i_03 
 where exists (select 1 from kdz_30_etl.dds_load_flights_i_01);
@@ -206,6 +209,8 @@ insert into kdz_30_etl.dds_load_flights_i_03 (loaded_ts)
 select ts2
 from kdz_30_etl.dds_load_flights_i_01
 where exists (select 1 from kdz_30_etl.dds_load_flights_i_01);
+
+-- конец etl 2 для данных погоды
 
 
 
