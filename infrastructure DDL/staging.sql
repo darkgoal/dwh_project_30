@@ -1,6 +1,6 @@
 -- for flights
 
-CREATE TABLE staging.flights (
+CREATE TABLE kdz_30_staging.flights (
 	flight_year int not NULL, 
 	flight_quarter int not NULL, 
 	flight_month int not NULL, 
@@ -25,7 +25,7 @@ CREATE TABLE staging.flights (
 
 -- initiation download - flights
 
-create table if not exists etl.load_flights_i_02 as
+create table if not exists kdz_30_etl.load_flights_i_02 as
 select distinct
 	cast(flight_year as int) as flight_year, 
 	cast(flight_quarter as int) as flight_quarter, 
@@ -44,7 +44,7 @@ select distinct
 	air_time::float as air_time,
 	distance::float as distance,
 	weather_delay::float as weather_delay
-from src.flights , etl.load_flights_i_01;
+from kdz_30_src.flights , kdz_30_etl.load_flights_i_01;
 
 
 
@@ -53,7 +53,7 @@ from src.flights , etl.load_flights_i_01;
 
 -- for weather
 
-CREATE TABLE staging.weather (
+CREATE TABLE kdz_30_staging.weather (
 	icao_code varchar(10) NOT NULL,
 	local_datetime timestamp NOT NULL,
 	air_temp numeric(3, 1) NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE staging.weather (
 
 -- initiation download - weather
 
-create table if not exists etl.load_weather_i_02 as
+create table if not exists kdz_30_etl.load_weather_i_02 as
 select distinct
 	icao_code,
 	to_timestamp(local_datetime, 'DD:MM:YYYY HH24:MI') as local_datetime,
@@ -92,5 +92,5 @@ select distinct
 	total_cloud_cover,
 	visibility::numeric(3, 1) as visibility,
 	dewpoint_temp::numeric(3, 1) as dewpoint_temp
-from src.weather;
+from kdz_30_src.weather;
 
