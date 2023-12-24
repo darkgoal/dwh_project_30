@@ -102,3 +102,31 @@ select
  local_datetime as date_start,
  coalesce(lead(local_datetime) over (order by local_datetime), '3000-01-01'::timestamp) as date_end
 from kdz_30_staging.weather;
+
+
+
+
+-- создание справочной таблицы - измерения КОД ОТМЕНЫ
+create table kdz_30_dds.cancellation_code_id(
+	cancellation_code char NOT NULL PRIMARY KEY,
+	reason varchar(25) NOT NULL
+);
+
+
+INSERT INTO kdz_30_dds.cancellation_code_id
+(cancellation_code, reason)
+VALUES('A', 'Carrier');
+
+INSERT INTO kdz_30_dds.cancellation_code_id
+(cancellation_code, reason)
+VALUES('B', 'Weather');
+
+INSERT INTO kdz_30_dds.cancellation_code_id
+(cancellation_code, reason)
+VALUES('C', 'National Air System');
+
+INSERT INTO kdz_30_dds.cancellation_code_id
+(cancellation_code, reason)
+VALUES('D', 'Security');
+
+
