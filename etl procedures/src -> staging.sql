@@ -39,7 +39,7 @@ select distinct
 	cast(flight_month as int) as flight_month , 
 	to_date(flight_date, 'MM/DD/YYYY') as flight_date, 
 	reporting_airline,
-	tail_number,
+	(case when tail_number is null then '' else tail_number end) as tail_number,
 	flight_number,
 	origin,
 	destination,
