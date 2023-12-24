@@ -9,6 +9,9 @@ Next steps:
   - [x] design etl2: staging -> dds
   - [x] write the code (etl2)
   - [x] design data marts (сделано за нас)
-  - [ ] design etl for tranfer etl3: dds -> marts
-  - [ ] design superset and or PowerBI visualisations
-  - [ ] начать делать отчет
+  - [x] design etl for tranfer etl3: dds -> marts
+  - [ ] BI 1
+  - [ ] BI 2
+  - [ ] закончить отчет
+  - [ ] видео отчет
+  - [ ] README тут
