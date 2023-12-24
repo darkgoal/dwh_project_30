@@ -1,14 +1,14 @@
 -- ETL 4: dds -> mart.fact_departure
 
 
--- 4.1 маркер последней загрузки, границы самых свежих данных
+-- 4.1 маркер последней загрузки
 
 create table if not exists kdz_30_etl.fact_download_03(
 loaded_ts timestamp not null primary key
 ); 
 
 
-
+-- 4.2 границы самых свежих данных
 drop table if exists kdz_30_etl.fact_download_01;
 -- проблем с потерей дат не будет, тк при join останутся все даты полетов
 create table if not exists kdz_30_etl.fact_download_01 as
@@ -20,7 +20,7 @@ where loaded_ts >= coalesce((select max(loaded_ts)
 from kdz_30_etl.fact_download_03), '1970-01-01');
 
 
--- 4.2 чтение данных (снимок)
+-- 4.3 чтение данных (снимок) с соединением с таблицей погоды по временному промежутку погоды и времени вылета
 drop table if exists kdz_30_etl.fact_download_02;
 
 create table if not exists kdz_30_etl.fact_download_02
@@ -51,7 +51,7 @@ where f.loaded_ts > ts1 and f.loaded_ts <= ts2;
 
 
 
--- 4.3 загрузка в таблицу фактов основной витрины данных
+-- 4.4 загрузка в таблицу фактов основной витрины данных
 insert into mart.fact_departure (
 	airport_origin_dk,
 	airport_destination_dk,
