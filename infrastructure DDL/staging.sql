@@ -25,14 +25,14 @@ CREATE TABLE kdz_30_staging.flights (
 
 -- initiation download - flights
 
-create table if not exists kdz_30_etl.load_flights_i_02 as
+create table if not exists kdz_30_etl.load_flights_02 as
 select distinct
 	cast(flight_year as int) as flight_year, 
 	cast(flight_quarter as int) as flight_quarter, 
 	cast(flight_month as int) as flight_month , 
 	to_date(flight_date, 'MM/DD/YYYY') as flight_date, 
 	reporting_airline,
-	tail_number,
+	(case when tail_number is null then '' else tail_number end) as tail_number,
 	flight_number,
 	origin,
 	destination,
@@ -44,7 +44,7 @@ select distinct
 	air_time::float as air_time,
 	distance::float as distance,
 	weather_delay::float as weather_delay
-from kdz_30_src.flights , kdz_30_etl.load_flights_i_01;
+from kdz_30_src.flights;
 
 
 
@@ -76,7 +76,7 @@ CREATE TABLE kdz_30_staging.weather (
 
 -- initiation download - weather
 
-create table if not exists kdz_30_etl.load_weather_i_02 as
+create table if not exists kdz_30_etl.load_weather_02 as
 select distinct
 	icao_code,
 	to_timestamp(local_datetime, 'DD:MM:YYYY HH24:MI') as local_datetime,
