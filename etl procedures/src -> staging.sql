@@ -8,32 +8,31 @@
 
 
 -- 2.1 -- создаем таблицу с маркером последнего обработанного значения
---drop table etl.load_flights_i_03;
 
-create table if not exists etl.load_flights_i_03(
+create table if not exists kdz_30_etl.load_flights_i_03(
 loaded_ts timestamp not null primary key
 -- маркер последнего обработанного значения
-); -- сюда подставим эту дату после загрузки
+); 
 
 
 
 -- 2.2 -- определение границ самых свежих данных в src
-drop table if exists etl.load_flights_i_01;
+drop table if exists kdz_30_etl.load_flights_i_01;
 
-create table if not exists etl.load_flights_i_01 as
+create table if not exists kdz_30_etl.load_flights_i_01 as
 select
 	min(loaded_ts) as ts1,
 	max(loaded_ts) as ts2
-from src.flights
+from kdz_30_src.flights
 where loaded_ts >= coalesce(
-	(select max(loaded_ts) from etl.load_flights_i_03), 
+	(select max(loaded_ts) from kdz_30_etl.load_flights_i_03), 
 '1970-01-01');
 
 
 
 -- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 
-create table if not exists etl.load_flights_i_02 as
+create table if not exists kdz_30_etl.load_flights_i_02 as
 select distinct
 	cast(flight_year as int) as flight_year, 
 	cast(flight_quarter as int) as flight_quarter, 
@@ -52,12 +51,12 @@ select distinct
 	air_time::float as air_time,
 	distance::float as distance,
 	weather_delay::float as weather_delay
-from src.flights , etl.load_flights_i_01
+from kdz_30_src.flights, kdz_30_etl.load_flights_i_01
 where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
 
 
 -- 2.4 запись в целевую таблицу в режиме upsert
-insert into staging.flights(
+insert into kdz_30_staging.flights(
 	flight_year, 
 	flight_quarter, 
 	flight_month , 
@@ -94,20 +93,19 @@ select
 	air_time,
 	distance,
 	weather_delay
-from etl.load_flights_i_02;
---on conflict(flight_date, flight_number, origin, destination, crs_dep_time) do nothing; - TODO
---raise exception 'Trying to update a previous line with --> %', (select * from excluded); - TODO
+from kdz_30_etl.load_flights_02;
+
 
 
 
 -- 2.5 обновление последней известной метки loaded_ts
-delete from etl.load_flights_i_03 
-where exists (select 1 from etl.load_flights_i_01);
+delete from kdz_30_etl.load_flights_03 
+where exists (select 1 from kdz_30_etl.load_flights_01);
 
-insert into etl.load_flights_i_03 (loaded_ts)
+insert into kdz_30_etl.load_flights_03 (loaded_ts)
 select ts2
-from etl.load_flights_i_01
-where exists (select 1 from etl.load_flights_i_01);
+from kdz_30_etl.load_flights_01
+where exists (select 1 from kdz_30_etl.load_flights_01);
 
 
 -- конец загрузки flights
@@ -118,10 +116,10 @@ where exists (select 1 from etl.load_flights_i_01);
 
 
 
--- шаг 2 для weather
+-- шаг 2 (ETL 1) для weather
 
 -- 2.1 -- создаем таблицу с маркером последнего обработанного значения
-create table if not exists etl.load_weather_i_03(
+create table if not exists kdz_30_etl.load_weather_03(
 loaded_ts timestamp not null primary key
 -- маркер последнего обработанного значения
 ); 
@@ -130,23 +128,23 @@ loaded_ts timestamp not null primary key
 
 
 -- 2.2 -- определение границ самых свежих данных в src
-drop table if exists etl.load_weather_i_01;
+drop table if exists kdz_30_etl.load_weather_01;
 
-create table if not exists etl.load_weather_i_01 as
+create table if not exists kdz_30_etl.load_weather_01 as
 select
 	min(loaded_ts) as ts1,
 	max(loaded_ts) as ts2
-from src.flights
+from kdz_30_src.flights
 where loaded_ts >= coalesce((select max(loaded_ts) 
-from etl.load_weather_i_03), '1970-01-01');
+from kdz_30_etl.load_weather_03), '1970-01-01');
 
 
 
 -- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 
-drop table if exists etl.load_weather_i_02;
+drop table if exists kdz_30_etl.load_weather_02;
 
-create table if not exists etl.load_weather_i_02 as
+create table if not exists kdz_30_etl.load_weather_02 as
 select distinct
 	icao_code,
 	to_timestamp(local_datetime, 'DD:MM:YYYY HH24:MI') as local_datetime,
@@ -162,14 +160,13 @@ select distinct
 	total_cloud_cover,
 	visibility::numeric(3, 1) as visibility,
 	dewpoint_temp::numeric(3, 1) as dewpoint_temp
-from src.weather, etl.load_weather_i_01
+from kdz_30_src.weather, kdz_30_etl.load_weather_01
 where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
 
 
-select * from etl.load_weather_i_02;
 
 -- 2.4 запись в целевую таблицу в режиме upsert
-insert into staging.weather(
+insert into kdz_30_staging.weather(
 	icao_code,
 	local_datetime,
 	air_temp,
@@ -199,16 +196,19 @@ insert into staging.weather(
 	total_cloud_cover,
 	visibility,
 	dewpoint_temp
-from etl.load_weather_i_02;
---raise exception 'Trying to update a previous line with --> %', (select * from excluded); -- TODO
+from kdz_30_etl.load_weather_02
+on conflict on constraint weather_pkey do nothing;
+
 
 
 
 -- 2.5 обновление последней известной метки loaded_ts
-delete from etl.load_weather_i_03 
-where exists (select 1 from etl.load_weather_i_01);
+delete from kdz_30_etl.load_weather_03 
+where exists (select 1 from kdz_30_etl.load_weather_01);
 
-insert into etl.load_weather_i_03 (loaded_ts)
+insert into kdz_30_etl.load_weather_03 (loaded_ts)
 select ts2
-from etl.load_weather_i_01 
-where exists (select 1 from etl.load_weather_i_01);
+from kdz_30_etl.load_weather_01 
+where exists (select 1 from kdz_30_etl.load_weather_01);
+
+-- конец etl1 для weather
