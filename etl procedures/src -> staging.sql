@@ -9,7 +9,7 @@
 
 -- 2.1 -- создаем таблицу с маркером последнего обработанного значения
 
-create table if not exists kdz_30_etl.load_flights_i_03(
+create table if not exists kdz_30_etl.load_flights_03(
 loaded_ts timestamp not null primary key
 -- маркер последнего обработанного значения
 ); 
@@ -17,22 +17,22 @@ loaded_ts timestamp not null primary key
 
 
 -- 2.2 -- определение границ самых свежих данных в src
-drop table if exists kdz_30_etl.load_flights_i_01;
+drop table if exists kdz_30_etl.load_flights_01;
 
-create table if not exists kdz_30_etl.load_flights_i_01 as
+create table if not exists kdz_30_etl.load_flights_01 as
 select
 	min(loaded_ts) as ts1,
 	max(loaded_ts) as ts2
 from kdz_30_src.flights
 where loaded_ts >= coalesce(
-	(select max(loaded_ts) from kdz_30_etl.load_flights_i_03), 
+	(select max(loaded_ts) from kdz_30_etl.load_flights_03), 
 '1970-01-01');
 
 
 
 -- 2.3 -- чтение сырых данных (снимок), которые раньше НЕ были обработаны
 
-create table if not exists kdz_30_etl.load_flights_i_02 as
+create table if not exists kdz_30_etl.load_flights_02 as
 select distinct
 	cast(flight_year as int) as flight_year, 
 	cast(flight_quarter as int) as flight_quarter, 
@@ -51,7 +51,7 @@ select distinct
 	air_time::float as air_time,
 	distance::float as distance,
 	weather_delay::float as weather_delay
-from kdz_30_src.flights, kdz_30_etl.load_flights_i_01
+from kdz_30_src.flights, kdz_30_etl.load_flights_01
 where loaded_ts > ts1 and loaded_ts <= ts2; -- ограничение на обработку 
 
 
