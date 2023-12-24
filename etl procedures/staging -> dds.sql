@@ -131,7 +131,7 @@ select
  max(loaded_ts) as ts2
 from staging.weather
 where loaded_ts >= coalesce((select max(loaded_ts) 
-from kdz_30_etl.dds_load_weather_i_03), '1970-01-01');
+from kdz_30_etl.dds_load_weather_03), '1970-01-01');
 
 -- 3.3 - снимок новых данных (с доп. обработкой)
 
