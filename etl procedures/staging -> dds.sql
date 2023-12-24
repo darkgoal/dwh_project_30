@@ -92,10 +92,11 @@ insert into kdz_30_dds.flights(
  air_time,
  distance
 from kdz_30_etl.dds_load_flights_02
-on conflict on constraint flights_pkey do update
-set (tail_number, destination, dep_time, dep_delay_min, cancelled, cancellation_code, air_time, distance, weather_delay, loaded_ts) = 
-	(EXCLUDED.tail_number, EXCLUDED.destination, EXCLUDED.dep_time, EXCLUDED.dep_delay_min, 
-	EXCLUDED.cancelled, EXCLUDED.cancellation_code, EXCLUDED.air_time, EXCLUDED.distance, EXCLUDED.weather_delay, now());;
+on conflict on constraint flights_pk do update
+set (tail_number, flight_dep_actual_ts, dep_delay_minutes, cancelled, cancellation_code, air_time, distance, weather_delay, loaded_ts) = 
+	(EXCLUDED.tail_number, EXCLUDED.flight_dep_actual_ts, EXCLUDED.dep_delay_minutes, 
+	EXCLUDED.cancelled, EXCLUDED.cancellation_code, EXCLUDED.air_time, EXCLUDED.distance, EXCLUDED.weather_delay, now());
+
 
 -- 3.5 обновление последней известной метки loaded_ts
 
