@@ -1,6 +1,4 @@
 -- 1 шаг - загрузка данных в src
-drop table src.flights;
-
 create table src.flights(
 flight_year varchar(5) not NULL, 
 flight_quarter varchar(5) not NULL, 
@@ -26,7 +24,6 @@ loaded_ts timestamp NOT NULL DEFAULT now()
 
 
 
-drop table src.weather;
 
 create table src.weather(
 icao_code varchar(10) default 'KJFK',
