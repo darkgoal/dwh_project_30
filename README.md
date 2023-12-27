@@ -1,17 +1,26 @@
-This repository cointains the code of the project for DataWarehouses course (HSE, Moscow, Business-Informatics 3d grade).
+# Описание проекта по дисциплине Хранилища Данных
 
-In this project we are supposed to get data of airplane flights in JFK airport, NYC, US and the weather in it during 4 months in 2021.
-Then, we gotta download them to the src lvl, create etl procedures for transferring the data to the staging lvl, detailed data storage lvl and data marts lvl.
-So far, everything up to staging is covered. 
+Этот репозиторий содержит код, разработанный в рамках проекта по дисциплине Хранилища Данных на 3 курсе Бизнес-информатики в ВШЭ.
 
-Next steps:
-  - [x] complete etl1: src -> staging cod 
-  - [x] design etl2: staging -> dds
-  - [x] write the code (etl2)
-  - [x] design data marts (сделано за нас)
-  - [x] design etl for tranfer etl3: dds -> marts
-  - [ ] BI 1
-  - [ ] BI 2
-  - [ ] закончить отчет
-  - [ ] видео отчет
-  - [ ] README тут
+## Код
+
+Наш код представляет собой реализацию ETL процедур, необходимых для загрузки данных в хранилище данных.
+
+## Системы источники
+
+Для получения данных мы использовали следующие системы источники:
+- Сайт US Bureau of Transportational Statistics для получения данных о полетах
+- Сайт погодных данных по аэропортам
+
+Данные были экспортированы в формат CSV и загружены в БД командой COPY в psql.
+
+## Целевая таблица
+
+Целевая таблица - таблица фактов mart.fact_departure.
+
+## Уровни данных
+
+Для каждого потока данных было реализовано 3 уровня:
+- Уровень сырых данных src. Сюда у нас попадают копии всех данных в системе-источнике. Там есть дубликаты, нет всех нужных типов данных.
+- Уровень временного хранения staging. Тут уже лежат данные в правильных типах, очищенные от дубликатов.
+- Уровень детализированных данных dds. Данные уже чистые и преобразованные. Например, в таблице staging.weather реализован второй тип хранения изменяющихся данных (SCD2).
